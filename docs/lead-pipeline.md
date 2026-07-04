@@ -4,7 +4,7 @@ This document explains how raw Google Places results are transformed into action
 
 ## The problem this solves
 
-A Google Places Nearby Search for "barber_shop" near a suburb might return 20 results. Some of those businesses already have a professional website. Some are major chains (Great Clips, Supercuts). Some have no phone number and no website, making them hard to contact. Some are permanently closed.
+A Google Places Nearby Search for "barber_shop" near a suburb might return 20 results. Some businesses already have a professional website. Some are major chains (McDonald's, Coles). Some have no phone number, making them hard to contact. Some are permanently closed.
 
 Without processing, you'd have to manually evaluate each result before deciding who to call. The lead pipeline automates that triage.
 
@@ -41,19 +41,13 @@ NormalizedPlace (from Google Places)
 
 | Rule | Status | Rationale |
 |---|---|---|
-| Business is not OPERATIONAL | `DISCARDED` | Closed or temporarily closed businesses are not prospects |
-| Business name matches a chain keyword | `DISCARDED` | Chains have centralised marketing; local sales calls are pointless |
-| No website AND has phone | `TODO` | Highest priority: they're contactable and lack a web presence |
-| No website AND no phone | `POTENTIAL_RESEARCH` | Need to find contact info manually before calling |
-| Has website AND no phone | `POTENTIAL_RESEARCH` | Might have contact form; check before discarding |
-| Has website AND has phone | `DISCARDED` | Already has a complete web presence; not a prospect |
+| Business is not OPERATIONAL | `DISCARDED` | Closed businesses are not prospects |
+| Business name matches a chain keyword | `DISCARDED` | Chains have centralised marketing; cold calls don't work |
+| Has a website | `DISCARDED` | Already has what we're selling — not a prospect |
+| No website AND has phone | `TODO` | Perfect lead — contactable and lacks a web presence |
+| No website AND no phone | `POTENTIAL_RESEARCH` | Good prospect but contact info needs research first |
 
-**Why this ordering matters:** The "no website + phone" case is deliberately the highest priority `TODO` because:
-- The business has demonstrated they're reachable (they have a phone).
-- They demonstrably lack a website (which is what we're selling).
-- There's no research step needed — you can call them immediately.
-
-The `POTENTIAL_RESEARCH` status covers ambiguous cases. These leads aren't discarded because there might be value there; they just require a manual step before calling.
+**The core logic for a web dev agency:** You are selling websites. If a business already has one, they are not a prospect — regardless of whether they also have a phone. The phone number is how you *contact* a lead; it has nothing to do with whether they need your service. A business with no website and a phone number is the ideal case: you know they need you and you can reach them directly.
 
 ## Chain detection
 
@@ -69,13 +63,11 @@ f45, orange theory, boost juice, starbucks, gloria jeans, ...
 
 Additionally, businesses with a `primaryType` of `shopping_mall` or `department_store` are flagged as chains regardless of name.
 
-**Why keywords instead of the Google "chain" signal?** Google doesn't directly expose a "this is a chain" boolean. The `types` array can include signals like `point_of_interest` vs `establishment`, but these don't reliably distinguish owner-operated businesses from franchises. The keyword list, while imperfect, catches the vast majority of chains that would waste call time.
-
-**Why not use rating count as a chain proxy?** A high review count could indicate a chain OR simply a popular local business. A high-rated local café with 500 reviews is exactly the kind of business worth calling. Using review count as a chain signal would produce too many false positives.
+**Why keywords instead of the Google "chain" signal?** Google doesn't directly expose a "this is a chain" boolean. The keyword list, while imperfect, catches the vast majority of chains that would waste call time.
 
 ## Gatekeeper risk
 
-Gatekeeper risk predicts how likely it is that calling the phone number will reach the decision-maker (the business owner) directly, vs a receptionist or admin who screens calls:
+Gatekeeper risk predicts how likely it is that calling the phone number will reach the decision-maker (the business owner) directly, versus a receptionist who screens calls:
 
 | Risk level | Business types |
 |---|---|
@@ -84,9 +76,7 @@ Gatekeeper risk predicts how likely it is that calling the phone number will rea
 | `HIGH` | Lawyers, accountants, dentists, doctors, medical clinics, hospitals, real estate agencies, banks, schools |
 | `UNKNOWN` | Any type not in the above lists |
 
-**Why this matters for prioritisation:** A barber shop is usually owner-operated. The person who answers the phone is often the owner. Call success rate is high. A dental clinic has a receptionist whose job is to screen calls; even if the dentist wants a website, getting them on the phone is hard. Low-gatekeeper leads are faster to work through.
-
-The gatekeeper risk is stored on the lead and surfaced in the `/leads` table so you can sort your TODO list by it.
+A barber shop is usually owner-operated — the person who answers the phone is often the owner. A dental clinic has a receptionist whose job is to screen calls. Low-gatekeeper leads are faster to work through and have a higher success rate.
 
 ## Lead scoring (0–100)
 
@@ -104,17 +94,16 @@ The gatekeeper risk is stored on the lead and surfaced in the `/leads` table so 
 | Gatekeeper risk: MEDIUM | −10 |
 | Chain detected | −50 |
 | Business not OPERATIONAL | −40 |
-| Has website AND has phone | −30 |
 
 The score is clamped to `[0, 100]`.
 
-**Why store the score?** The score is computed at import time and stored as a column. This lets the `/leads` page sort by score with a simple `ORDER BY leadScore DESC` backed by an index. Computing the score on every read would require fetching all relevant fields and calculating in application code, which doesn't scale and can't be indexed.
+**Why store the score?** Computed at import time and stored as a column so the `/leads` page can sort by score with a simple `ORDER BY leadScore DESC` backed by an index. Computing on every read doesn't scale and can't be indexed.
 
-**Why these weights?** The weights reflect the goal of the tool: finding owner-operated local businesses that lack a website. "No website" is the primary signal (+40) because that's the qualifying criterion for the sale. "Has phone" is secondary (+25) because without a phone, you can't call them. Gatekeeper risk adjusts the expected difficulty of actually reaching the owner. Rating and review count are minor signals: a well-reviewed business is likely still operating and engaged, making them a more valuable prospect.
+**Why these weights?** "No website" is the primary signal (+40) because that's the qualifying criterion for the sale. "Has phone" is secondary (+25) because without it you can't call them. Gatekeeper risk adjusts expected difficulty of reaching the owner. Rating and review count are minor signals: a well-reviewed business is likely active and engaged — a more valuable prospect.
 
 ## Category buckets
 
-Each business gets a `categoryBucket` label that groups related `primaryType` values into a human-readable category:
+Each business gets a `categoryBucket` label grouping related `primaryType` values:
 
 | Bucket | Types it covers |
 |---|---|
@@ -127,11 +116,9 @@ Each business gets a `categoryBucket` label that groups related `primaryType` va
 | Professional Services | lawyer, accounting, insurance_agency, real_estate_agency |
 | Fitness | gym, fitness_center, yoga_studio, sports_coaching |
 
-**Why bucket?** The `/leads` page and future filter UI can group or filter by bucket rather than exposing raw Google type strings like `physiotherapist` or `roofing_contractor` to the user.
-
 ## Status state machine
 
-After import, a lead's `leadStatus` can be manually changed in the `/leads` UI or automatically advanced by the call log system.
+After import, a lead's `leadStatus` can be manually changed in the `/leads` UI or via the dashboard.
 
 ```
 TODO ──────────────────────────────────────────────► CONTACTED
@@ -147,7 +134,7 @@ TODO ─────────────────────────
                                          DO_NOT_CALL
 ```
 
-Manual transitions via the status dropdown in `/leads` are unrestricted — you can move a lead to any status at any time.
+Manual transitions via the status dropdown in `/leads` or the dashboard lead cards are unrestricted.
 
 Automatic transitions via `POST /api/leads/[id]/call-log` follow this mapping:
 
@@ -165,7 +152,16 @@ Automatic transitions via `POST /api/leads/[id]/call-log` follow this mapping:
 | DO_NOT_CALL | DO_NOT_CALL |
 | OTHER | CONTACTED |
 
-**Why automatic status advancement?** Requiring the user to manually change the status after logging a call outcome is redundant. The outcome already implies the next state. Automating it reduces friction and keeps the pipeline moving correctly even if the user forgets to update the status manually.
+## Quota counting
+
+The dashboard tracks a daily call quota. A lead counts toward the quota when:
+
+1. Its status transitions from `TODO` to any other status.
+2. The same lead has not already been counted for the same local calendar date.
+
+This is recorded in the `LeadStatusChange` table. The `countedForDailyQuota` boolean on each record tracks whether that transition counted. A lead can move from TODO → PENDING → TODO → PENDING in a day, but it only counts once.
+
+**Why only TODO → other?** The point of the quota is to track how many "fresh" leads you have actioned — moved off the cold list. Subsequent status changes (PENDING → SUCCEEDED) are meaningful but shouldn't inflate the daily count.
 
 ## Suburb extraction
 
@@ -177,11 +173,11 @@ The `suburb` field is extracted from `formattedAddress` by taking the third-to-l
                   → "Kensington"
 ```
 
-This is a heuristic that works for standard Australian address formats. It may produce incorrect results for addresses with unusual formats (e.g. building names, no suburb). The field is stored as nullable and used only for display and future filtering — it's not used for any business logic.
+This is a heuristic that works for standard Australian address formats. The field is stored as nullable and used only for display — not for business logic.
 
 ## What `cleanPlace` does NOT do
 
-- It does not call any external APIs. All decisions are made from the data already returned by Google Places.
-- It does not look up the website to check whether it's a "real" website vs a placeholder. That would require web scraping and is not in scope.
-- It does not analyse the phone number (e.g. to detect if it's a VoIP number or call centre). The number is taken at face value.
-- It does not update a lead's status if that lead already exists in the database. The importer (`lead-importer.ts`) only calls `cleanPlace()` for new leads. Existing leads keep whatever status a human has set.
+- It does not call any external APIs. All decisions are made from data already returned by Google Places.
+- It does not visit the website to check quality. Whether a business has a good or bad website is not evaluated.
+- It does not analyse the phone number (e.g. VoIP vs landline).
+- It does not update a lead's status if that lead already exists in the database. Existing leads keep whatever status a human has set.

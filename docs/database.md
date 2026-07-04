@@ -125,16 +125,40 @@ A join table linking a `BusinessLead` to the `SearchRun` that imported it. Also 
 
 Records individual call attempts. Each entry has a `CallOutcome` enum value and an optional note. When a call log is created via `POST /api/leads/[id]/call-log`, the route also updates the lead's `leadStatus` based on a deterministic outcome-to-status mapping (e.g. `CLOSED` → `SUCCEEDED`, `NOT_INTERESTED` → `DEAD_END`).
 
+### `AppSettings`
+
+A single-row settings table (id is always `"default"`). Stores:
+- `dailyCallQuota` — how many leads to action per day (default 5, range 1–200).
+- `timezone` — IANA timezone string used to compute the local calendar date for quota resets (default `"Australia/Sydney"`).
+
+Updated via `PATCH /api/settings`. Read via `GET /api/settings` (which upserts the default row if it doesn't exist).
+
+### `LeadStatusChange`
+
+Records every status transition made through the dashboard. Each row stores:
+- `fromStatus` / `toStatus` — the before and after.
+- `localDate` — the calendar date in the configured timezone when the change was made (format: `YYYY-MM-DD`).
+- `countedForDailyQuota` — `true` if this transition counted toward the daily quota.
+
+**Quota counting rule:** A transition counts when `fromStatus === 'TODO'` AND `toStatus !== 'TODO'` AND no previous counted record exists for the same `businessLeadId` on the same `localDate`. This means a lead can only contribute once to a day's quota, even if it's moved back to TODO and re-actioned.
+
+The `localDate` field uses the `en-CA` locale with `Intl.DateTimeFormat` which produces `YYYY-MM-DD` — sortable and unambiguous across timezones.
+
 ## Indexes
 
 All frequently-filtered columns on `BusinessLead` have explicit indexes:
 - `leadStatus` — the leads page filters by this on every tab switch.
-- `primaryType` and `suburb` — planned filter options.
-- `hasWebsite`, `hasPhone` — used by the cleaner's logic and future filter UI.
+- `primaryType` and `suburb` — filter options.
+- `hasWebsite`, `hasPhone` — used by the cleaner's logic and filter UI.
 - `leadScore` — the default sort order.
 - `isChainLikely` — useful for bulk exclusion queries.
 
-Without these indexes, filtering a table of thousands of leads would require a full table scan on every tab switch in the `/leads` page.
+`LeadStatusChange` indexes:
+- `businessLeadId` — look up all changes for a given lead.
+- `localDate` — count how many quota-counted changes happened today (dashboard summary query).
+- `countedForDailyQuota` — filter to counted transitions only.
+
+Without these indexes, filtering a table of thousands of leads or computing daily quota progress would require full table scans.
 
 ## Singleton pattern
 

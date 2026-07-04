@@ -4,7 +4,7 @@ All routes live under `src/app/api/`. They are Next.js Route Handlers (App Route
 
 ## Places routes (no database)
 
-These routes exist purely to proxy Google Places API calls server-side, keeping the API key out of the browser.
+These routes proxy Google Places API calls server-side, keeping the API key out of the browser.
 
 ---
 
@@ -31,10 +31,6 @@ Calls `https://places.googleapis.com/v1/places:searchNearby`.
 }
 ```
 
-`rawCount` is the number of results Google returned before any deduplication. The frontend uses it for the StatsBar.
-
-**Why a POST instead of GET?** The search parameters (coordinates, radius, type list) are sent as a JSON body. While technically these could be query parameters, a JSON body is easier to validate and extend. The Places API itself uses POST for search requests; mirroring that makes the proxy layer thin.
-
 ---
 
 ### `POST /api/places/text`
@@ -54,8 +50,6 @@ Calls `https://places.googleapis.com/v1/places:searchText`.
 ---
 
 ## Lead routes (Prisma Postgres)
-
-These routes read from and write to the database. They all use the `prisma` singleton from `src/lib/prisma.ts`.
 
 ---
 
@@ -86,17 +80,12 @@ Receives a `NormalizedPlace[]` array and runs the full cleaning + import pipelin
   "existingLeadsCount": 2,
   "todoCount": 5,
   "potentialCount": 3,
-  "discardedCount": 2,
+  "discardedCount": 4,
   "imported": [
     { "googlePlaceId": "ChIJ...", "name": "...", "wasNew": true, "finalStatus": "TODO", "leadScore": 80 }
   ]
 }
 ```
-
-**Design decisions:**
-- The route validates that `places` is an array and `source` is one of the two valid enum values. It does not validate individual `NormalizedPlace` fields — those come from the Places API proxy, which is trusted.
-- The actual work is delegated to `importPlacesToDatabase()`. The route handler only handles HTTP concerns (parsing, validation, error response format).
-- Errors from the database are caught, logged server-side, and returned as `{ error: "Import failed" }` with a 500 status. The actual error is never sent to the browser (it may contain connection string fragments or SQL).
 
 ---
 
@@ -109,26 +98,18 @@ Returns a paginated, filtered list of leads.
 |---|---|---|
 | `status` | LeadStatus | Filter by lead status |
 | `categoryBucket` | string | Filter by category (e.g. "Beauty") |
-| `primaryType` | string | Filter by Google type |
 | `hasWebsite` | boolean | "true" or "false" |
 | `hasPhone` | boolean | "true" or "false" |
 | `minScore` | number | Minimum lead score |
 | `limit` | number | Max results (capped at 500) |
 | `offset` | number | Pagination offset |
-| `sort` | string | Sort column: `leadScore`, `createdAt`, `updatedAt`, `name` |
+| `sort` | string | `leadScore`, `createdAt`, `updatedAt`, `name` |
 | `order` | string | `asc` or `desc` |
 
 **Response:**
 ```json
-{
-  "leads": [BusinessLead, ...],
-  "total": 47
-}
+{ "leads": [BusinessLead, ...], "total": 47 }
 ```
-
-The `total` reflects the count matching the filters (not just the current page), so the frontend can show "47 leads" even when displaying only 200 at a time.
-
-**Why cap limit at 500?** Returning thousands of leads in a single response could cause browser memory issues when rendered into a table. 500 is a practical upper bound for a single-operator tool.
 
 ---
 
@@ -138,27 +119,22 @@ Updates a lead's status and optionally its notes.
 
 **Request body:**
 ```json
-{
-  "leadStatus": "CONTACTED",
-  "notes": "Spoke with owner, interested"
-}
+{ "leadStatus": "CONTACTED", "notes": "Spoke with owner, interested" }
 ```
 
 **Response:** The updated `BusinessLead` record.
-
-**Why PATCH instead of PUT?** PATCH is semantically correct for partial updates. The route only changes `leadStatus` and optionally `notes` — it does not require or accept the full lead record. PUT implies replacing the entire resource.
 
 ---
 
 ### `POST /api/leads/[id]/call-log`
 
-Records a call attempt and automatically advances the lead's status based on the outcome.
+Records a call attempt and automatically advances the lead's status.
 
 **Request body:**
 ```json
 {
   "outcome": "SENT_LINK",
-  "notes": "Spoke with owner, sent link to portfolio",
+  "notes": "Sent portfolio link",
   "nextFollowUpAt": "2026-07-11T09:00:00.000Z"
 }
 ```
@@ -171,27 +147,140 @@ Records a call attempt and automatically advances the lead's status based on the
 }
 ```
 
-The call log creation and status update are wrapped in a `prisma.$transaction()` — both succeed or both fail together. This prevents a state where the call is logged but the status wasn't updated (or vice versa).
+---
 
-**Outcome-to-status mapping:** See [lead-pipeline.md](./lead-pipeline.md) for the full mapping table.
+## Dashboard routes
+
+---
+
+### `GET /api/dashboard/summary`
+
+Returns quota progress and per-group lead counts for the dashboard header card.
+
+**Response:**
+```json
+{
+  "quota": 5,
+  "completedToday": 2,
+  "remainingToday": 3,
+  "timezone": "Australia/Sydney",
+  "localDate": "2026-07-04",
+  "countsByGroup": {
+    "todo": 12,
+    "potential": 4,
+    "inProgress": 3,
+    "approved": 1,
+    "declined": 8
+  }
+}
+```
+
+`completedToday` counts `LeadStatusChange` records where `countedForDailyQuota = true` and `localDate` equals today in the configured timezone. See [lead-pipeline.md](./lead-pipeline.md) for the quota counting rules.
+
+---
+
+### `GET /api/dashboard/leads`
+
+Returns leads filtered by dashboard group.
+
+**Query parameters:**
+| Parameter | Type | Description |
+|---|---|---|
+| `group` | string | One of: `todo`, `potential`, `inProgress`, `approved`, `declined` |
+| `limit` | number | Max results (capped at 500, default 100) |
+| `offset` | number | Pagination offset |
+
+**Group-to-status mapping:**
+
+| Group | Statuses included |
+|---|---|
+| `todo` | TODO |
+| `potential` | POTENTIAL_RESEARCH |
+| `inProgress` | PENDING, CONTACTED |
+| `approved` | SUCCEEDED |
+| `declined` | DEAD_END, DISCARDED, DO_NOT_CALL |
+
+**Response:**
+```json
+{ "leads": [BusinessLead, ...], "total": 12 }
+```
+
+Leads are ordered by `leadScore DESC` so the highest-priority ones appear first.
+
+---
+
+### `PATCH /api/dashboard/leads/[id]`
+
+Updates a lead's status and/or notes from the dashboard. Handles quota counting.
+
+**Request body:**
+```json
+{ "leadStatus": "PENDING", "notes": "Called, interested" }
+```
+
+**Response:**
+```json
+{
+  "lead": { "id": "...", "leadStatus": "PENDING", ... },
+  "quotaCounted": true
+}
+```
+
+`quotaCounted` is `true` when the transition was from `TODO` to a non-TODO status AND the lead had not already been counted today. The frontend uses this to trigger a summary refresh.
+
+**Quota logic (server-side):**
+1. Load the existing lead.
+2. If status is changing from `TODO` to non-`TODO`, check `LeadStatusChange` for an existing counted record for this lead on today's local date.
+3. If none exists, create the `LeadStatusChange` record with `countedForDailyQuota = true`.
+4. Update the lead's status and/or notes.
+
+---
+
+## Settings routes
+
+---
+
+### `GET /api/settings`
+
+Returns the current app settings. Creates a default record if none exists.
+
+**Response:**
+```json
+{
+  "id": "default",
+  "dailyCallQuota": 5,
+  "timezone": "Australia/Sydney",
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+```
+
+---
+
+### `PATCH /api/settings`
+
+Updates one or both settings fields.
+
+**Request body:**
+```json
+{ "dailyCallQuota": 10, "timezone": "America/New_York" }
+```
+
+**Validation:**
+- `dailyCallQuota` must be an integer between 1 and 200.
+- `timezone` must be a non-empty string.
+
+**Response:** The updated `AppSettings` record.
+
+---
 
 ## Error handling conventions
 
-All routes follow the same error response format:
+All routes return errors in the same format:
 ```json
 { "error": "Human-readable message" }
 ```
 
-- `400` — bad request (missing required field, invalid enum value, malformed JSON)
-- `500` — database error or unexpected failure (full error logged server-side only)
-- `404` — not implemented yet (Prisma's `findUnique` returning null would return a 404 in a future version of the status and call-log routes)
-
-## Input validation approach
-
-The routes validate only the fields that, if wrong, would cause a database error or incorrect behavior:
-- `places` must be an array (otherwise the loop in `importPlacesToDatabase` would throw).
-- `source` must be a valid enum value (otherwise the Prisma insert would throw a validation error).
-- `leadStatus` must be a valid enum value (otherwise the PATCH would write an invalid value).
-- `outcome` must be a valid enum value (otherwise the call-log insert would fail and the outcome-to-status mapping would return `undefined`).
-
-Fields like individual `NormalizedPlace` properties are not validated because they come from trusted internal sources (the Places API proxy routes, which are not public-facing inputs).
+- `400` — bad request (missing field, invalid enum value, validation failure)
+- `404` — lead not found
+- `500` — database error (full error logged server-side only, never sent to browser)

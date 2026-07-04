@@ -1,96 +1,126 @@
 # UI/UX Decisions
 
-## Overall layout
+## Global navigation bar
 
-The app uses a fixed two-column layout that fills the full viewport height:
+A single `Navbar` component in `src/app/layout.tsx` appears on every page. It contains:
+- Logo + "LeadGen" wordmark (left)
+- Three navigation links: Search · Leads DB · Dashboard (highlighted green when active, using `usePathname`)
 
-```
-┌──────────────────────────────────────────────────────────┐
-│  Header bar (h-12)                                       │
-├──────────────┬───────────────────────────────────────────┤
-│              │  StatsBar                                 │
-│  Dark        ├───────────────────────────────────────────┤
-│  Sidebar     │  Map (h-80, fixed height)                 │
-│  (w-72)      ├───────────────────────────────────────────┤
-│              │  Results table (flex-1, scrollable)       │
-└──────────────┴───────────────────────────────────────────┘
-```
+**Why global instead of per-page?** Previously each page had its own header. As the number of pages grew, navigation links had to be added to three separate files. A global navbar is the single source of truth — adding a new page requires one change in `Navbar.tsx` only.
 
-**Why `h-screen` with `overflow-hidden` at the root?** This prevents the page from scrolling as a whole. Instead, only specific regions scroll — the sidebar category list and the results table. This keeps the map and the search controls always visible without the user having to scroll back to them.
+**Why not a sidebar nav?** The search page already uses a full-height sidebar for controls. A top navbar doesn't compete with it and works consistently across all three pages which have different layouts.
 
-**Why a fixed sidebar width (`w-72`) instead of a resizable panel?** The sidebar contains a fixed set of controls. The content doesn't grow horizontally, so a fixed width is correct. Resizable panels add complexity (drag handles, state persistence) that isn't warranted for a single-operator tool.
+## Page layouts
 
-## Dark sidebar, light content
+Each page fits inside the `flex-1` wrapper beneath the navbar:
 
-The sidebar uses `bg-slate-900` (dark) while the main content area uses `bg-slate-50` / `bg-white` (light). This contrast serves a functional purpose:
-
-- **Visual separation.** The sidebar is the control panel; the main area is the output. Dark/light contrast immediately communicates this without any explicit labelling.
-- **Reduces eye strain during long sessions.** The sidebar with its many checkboxes and inputs is not scanned constantly — it's configured once per search. A dark background reduces the visual prominence of a region that isn't the focus of attention most of the time.
-- **Indigo accent works in both modes.** Indigo (`#4F46E5`) is bright enough to be legible on dark slate and provides enough contrast on light backgrounds. Using a single accent colour across both regions creates visual coherence.
-
-## Segmented controls for mode and rank
-
-The Nearby/Text mode toggle and the Distance/Popularity rank toggle use a segmented control (two buttons side-by-side, the active one filled with indigo):
+### Search page (`/`)
 
 ```
-[● Nearby Search] [  Text Search  ]
+┌────────────────────────────────────────────────────┐
+│  Navbar (global, h-12)                             │
+├────────────────────────────────────────────────────┤
+│  Action bar (h-10) — hint text + Import to DB btn  │
+├──────────────┬─────────────────────────────────────┤
+│              │  StatsBar                           │
+│  Dark        ├─────────────────────────────────────┤
+│  Sidebar     │  Map (h-80, fixed height)           │
+│  (w-72)      ├─────────────────────────────────────┤
+│              │  Results table (flex-1, scrollable) │
+└──────────────┴─────────────────────────────────────┘
 ```
 
-**Why not a `<select>` dropdown?** A dropdown hides the available options until clicked. A segmented control shows both options at all times, making it immediately obvious what states are available and which is active. For binary or three-way choices, a segmented control is faster to read and faster to change.
+**Why `overflow-hidden` at the root?** Prevents the page from scrolling as a whole. Only specific regions scroll — the sidebar category list and the results table. This keeps the map and controls always visible.
 
-## Category checkboxes
+### Leads DB (`/leads`)
 
-The 43 categories are organised into 8 labelled groups in the sidebar. Each group has:
-- A section heading in `text-[10px] uppercase tracking-widest text-slate-500` — small enough to not compete with the category labels but clearly delineating the groups.
-- Custom-styled checkboxes: an actual `<input type="checkbox">` with `sr-only` (screen-reader only) is overlaid by a styled `div` that shows the indigo fill when checked.
+```
+┌────────────────────────────────────────────────────┐
+│  Navbar (global, h-12)                             │
+├────────────────────────────────────────────────────┤
+│  Sub-header (h-10) — "Lead Database" + count       │
+├────────────────────────────────────────────────────┤
+│  Status tab bar                                    │
+├────────────────────────────────────────────────────┤
+│  Table (flex-1, scrollable)                        │
+└────────────────────────────────────────────────────┘
+```
 
-**Why custom-style the checkboxes instead of using native ones?** Native checkboxes have inconsistent appearance across browsers and operating systems. They cannot be styled to match the dark sidebar theme without being replaced entirely. The `sr-only` actual input preserves keyboard navigation and screen reader accessibility while giving full visual control.
+### Dashboard (`/dashboard`)
 
-**Why groups instead of a flat list?** 43 items in a flat list is overwhelming. Grouping by business type (Beauty, Auto, Trades, etc.) lets users find and select a relevant subset quickly without reading through all 43 names.
+```
+┌────────────────────────────────────────────────────┐
+│  Navbar (global, h-12)                             │
+├────────────────────────────────────────────────────┤
+│  Scrollable content (max-w-3xl, centered)          │
+│    ┌──────────────────────────────────────────┐    │
+│    │  Daily Quota Card (progress bar)         │    │
+│    ├──────────────────────────────────────────┤    │
+│    │  Status tabs + Lead card list            │    │
+│    └──────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────┘
+```
 
-## StatsBar
+The dashboard is the only page that scrolls vertically (it uses `overflow-auto` rather than `overflow-hidden`). Lead cards can stack to any length, so clamping to viewport height would make the list unusable.
 
-Four metric cards above the map:
+## Dark sidebar, light content (search page)
 
-| Card | Colour | Meaning |
-|---|---|---|
-| Returned | Slate | Raw count from the last search response |
-| New | Emerald | Results that weren't already in the table |
-| Dupes | Amber | Results already present (skipped) |
-| Total Unique | Indigo | Running total across all searches this session |
+The sidebar uses `bg-brand-navy` while the main area uses `bg-slate-50` / `bg-white`. This contrast communicates structure visually: the sidebar is the control panel, the main area is the output.
 
-**Why these four?** They answer the implicit question after every search: "was that useful?" If Dupes is high relative to Returned, you've already covered this area for this category. If New is high, the search found fresh prospects. Total Unique shows the session's cumulative progress.
+## Dashboard design
 
-**Why large `text-2xl` numbers with tiny `text-[10px] uppercase` labels?** The number is the information; the label is context. Leading with the large number means you can read the stat at a glance without first processing the label.
+**Daily Quota Card.** Shows `completedToday / quota` with a green progress bar. When quota is met, a "✓ Quota complete" label appears next to the count. A Settings button in the card opens the quota modal.
 
-## Results table
+**Why a progress bar instead of a number?** At a glance you can see how far through your day you are without reading numbers. The bar fills green — green = progress, empty = more to do.
 
-**Dark header, light rows.** The `bg-slate-800 text-slate-300` table header creates a strong visual anchor for the column names. Alternating `bg-white` / `bg-slate-50/60` rows aid reading across wide rows. `hover:bg-indigo-50` gives clear hover feedback.
+**Status tabs.** Five tabs: To Do · Potential · In Progress · Approved · Declined. Each tab shows a live count badge. The badge turns green when that tab is active. Counts update when leads are moved between groups.
 
-**Sortable columns.** Name, Type, Rating, and Distance are sortable by clicking the column header. The sort indicator (`▲` / `▼`) is faint by default and becomes solid only for the active sort column. Hovering any column shows a faint indicator so the sorting capability is discoverable without cluttering the header.
+**Lead cards.** Each card shows:
+- Business name + status badge
+- Category and address excerpt
+- Lead score (top right, subtle)
+- Phone (tap-to-call link), website, maps links
+- Quick action buttons (for TODO group only): In Progress, Approved, Declined, Move to Potential
+- Notes textarea + status dropdown + Save button
 
-**Filter input.** A single text filter above the table searches across name, type, address, and source query. This handles the common case of "I want to see all the barbers I found" after accumulating results across multiple searches.
+**Why quick action buttons only on TODO?** The TODO tab is the primary working list — the inbox. Quick buttons let you triage leads with a single click without touching the dropdown. On other tabs, the dropdown is sufficient because you're not moving through a list rapidly.
 
-**DB badge.** After importing to the database, rows that were imported show a small violet "DB" badge next to their name. This is a transient indicator: it shows only for the current import session. On the next page load, there's no badge (to avoid cluttering every row for users who have imported all their results). The purpose is to give immediate confirmation that the import worked.
+**Lead removal on action.** When a lead's status changes and it no longer belongs to the current tab, it is removed from the list immediately (optimistic update). This keeps the list clean and confirms the action worked without a page reload.
 
-## `/leads` page
+## Color design (70-20-10)
 
-**Tab-per-status layout.** Each `LeadStatus` value gets its own tab. This maps the pipeline stages directly to the navigation: TODO is your inbox, PENDING is work in progress, SUCCEEDED is closed deals. Switching tabs is the primary navigation pattern in a CRM-style workflow.
+The UI follows the 70-20-10 color principle derived from the logo:
 
-**Status dropdown inline in the table.** Rather than requiring the user to open a detail panel to change a lead's status, the dropdown sits directly in the table row. For a high-volume workflow (reviewing 50 TODO leads and moving some to PENDING), inline editing is significantly faster than open-edit-save cycles.
+| Role | Token | Hex | Usage |
+|---|---|---|---|
+| 70% background | white / `slate-50` | — | Page and card backgrounds |
+| 20% structure | `brand-navy` | `#0D1B2A` | Sidebar, table headers |
+| 10% accent | `brand-green` | `#34A853` | Active states, buttons, progress bar |
+| Links | `brand-blue` | `#1A73E8` | Phone, website, maps links |
 
-**Notes textarea saves on blur.** The notes field doesn't have an explicit save button. It saves automatically when focus leaves the field. This is consistent with how notes fields behave in tools like Notion and Linear. An explicit button would add one extra click per note — across many leads, this adds up.
+All tokens are defined in `tailwind.config.ts` under `theme.extend.colors.brand`.
 
-**Lead score column.** The lead score (0–100) is displayed in the table to help prioritise within a tab. All leads in the TODO tab are worth calling, but a score-80 lead (no website, phone available, low gatekeeper risk) should be called before a score-35 lead (no website, no phone, high gatekeeper risk). The table defaults to sorting by score descending.
+## Segmented controls (search page)
 
-## Header bar
+The Nearby/Text mode toggle and Distance/Popularity rank toggle use a segmented control — both options visible at all times, the active one filled. This is faster to read and change than a `<select>` dropdown, which hides options until clicked.
 
-The main search page header contains:
-- App name and subtitle (left)
-- "Leads DB" nav pill (links to `/leads`)
-- "Import to DB" button (violet, disabled until results exist)
-- Error toast (right, dismissable)
+## Category checkboxes (search sidebar)
 
-**Why put the Import button in the header instead of the sidebar?** The Import action operates on the accumulated results, not on the search configuration. Placing it in the search sidebar would imply it's part of the search workflow. The header is the right place for actions that affect the whole page's state.
+43 categories organised into 8 labelled groups. Custom-styled using a hidden native `<input type="checkbox">` with a styled overlay div. The native input is `sr-only` so keyboard navigation and screen readers still work.
 
-**Why violet for import-related elements?** The search UI uses indigo (Tailwind `indigo-600`). Import and database-related elements use violet (Tailwind `violet-600`). This creates a visual distinction: indigo = search, violet = database. When you see a violet element, it's telling you something about the database state.
+## Results table (search page)
+
+- **Dark header, light rows.** `bg-brand-navy text-slate-300` header creates a strong visual anchor. Alternating row colours aid reading across wide rows. Hover uses `bg-brand-green-light`.
+- **Sortable columns.** Name, Type, Rating, Distance. Sort indicator is faint by default, solid only for the active column. Hovering shows a faint indicator — discoverable without cluttering the header.
+- **DB badge.** After import, rows show a small green "DB" badge. Transient — only for the current session's import. Purpose: immediate confirmation that the import worked.
+
+## Leads DB page (`/leads`)
+
+- **Tab-per-status.** Each `LeadStatus` value gets its own tab. TODO is the inbox; SUCCEEDED is closed deals.
+- **Inline status dropdown.** Change a lead's status without opening a detail panel. For high-volume review of 50 TODO leads, inline editing is significantly faster than open-edit-save.
+- **Notes save on blur.** No explicit save button — saves when focus leaves the field. Consistent with tools like Notion and Linear.
+- **Default sort by score.** The table defaults to `ORDER BY leadScore DESC` — highest-priority leads appear first within each tab.
+
+## Settings modal (dashboard)
+
+A minimal modal with a single number input for daily quota (1–200). Accessed via the Settings button in the quota card. Validates client-side before sending to the server. Saves to `AppSettings` via `PATCH /api/settings`.
