@@ -10,3 +10,4 @@ out
 
 # Bun lockfile (using npm)
 bun.lockb
+.prisma/
