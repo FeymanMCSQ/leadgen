@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadStatus {
+  TODO
+  POTENTIAL_RESEARCH
+  PENDING
+  CONTACTED
+  DEAD_END
+  SUCCEEDED
+  DISCARDED
+  DO_NOT_CALL
+}
+
+enum LeadSource {
+  GOOGLE_NEARBY
+  GOOGLE_TEXT
+  MANUAL
+}
+
+enum GatekeeperRisk {
+  LOW
+  MEDIUM
+  HIGH
+  UNKNOWN
+}
+
+enum CallOutcome {
+  NO_ANSWER
+  WRONG_NUMBER
+  GATEKEEPER
+  OWNER_UNAVAILABLE
+  PERMISSION_TO_SEND
+  SENT_LINK
+  NOT_INTERESTED
+  FOLLOW_UP
+  CLOSED
+  DO_NOT_CALL
+  OTHER
+}
+
+model BusinessLead {
+  id                  String         @id @default(cuid())
+  googlePlaceId       String         @unique
+  name                String
+  normalizedName      String
+  primaryType         String?
+  types               String[]       @default([])
+  categoryBucket      String?
+  formattedAddress    String?
+  suburb              String?
+  latitude            Float?
+  longitude           Float?
+  googleMapsUri       String?
+  websiteUri          String?
+  nationalPhoneNumber String?
+  rating              Float?
+  userRatingCount     Int?
+  businessStatus      String?
+  source              LeadSource
+  sourceQuery         String?
+  searchAreaLabel     String?
+  hasWebsite          Boolean
+  hasPhone            Boolean
+  isChainLikely       Boolean        @default(false)
+  gatekeeperRisk      GatekeeperRisk @default(UNKNOWN)
+  leadStatus          LeadStatus     @default(TODO)
+  leadScore           Int            @default(0)
+  cleaningReasons     String[]       @default([])
+  firstSeenAt         DateTime       @default(now())
+  lastSeenAt          DateTime       @updatedAt
+  lastImportedAt      DateTime?
+  previewUrl          String?
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  importEvents  ImportEvent[]
+  callLogs      CallLog[]
+  statusChanges LeadStatusChange[]
+
+  @@index([leadStatus])
+  @@index([primaryType])
+  @@index([hasWebsite])
+  @@index([hasPhone])
+  @@index([leadScore])
+  @@index([suburb])
+  @@index([isChainLikely])
+}
+
+model SearchRun {
+  id                 String    @id @default(cuid())
+  mode               String
+  areaLabel          String?
+  centerLat          Float?
+  centerLng          Float?
+  radiusMeters       Int?
+  textQuery          String?
+  includedTypes      String[]  @default([])
+  rawResultsCount    Int       @default(0)
+  newLeadsCount      Int       @default(0)
+  existingLeadsCount Int       @default(0)
+  todoCount          Int       @default(0)
+  potentialCount     Int       @default(0)
+  discardedCount     Int       @default(0)
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  importEvents ImportEvent[]
+}
+
+model ImportEvent {
+  id             String     @id @default(cuid())
+  searchRunId    String?
+  businessLeadId String
+  googlePlaceId  String
+  wasNew         Boolean
+  previousStatus LeadStatus?
+  finalStatus    LeadStatus
+  importReason   String?
+  createdAt      DateTime   @default(now())
+
+  searchRun    SearchRun?   @relation(fields: [searchRunId], references: [id])
+  businessLead BusinessLead @relation(fields: [businessLeadId], references: [id])
+
+  @@index([searchRunId])
+  @@index([businessLeadId])
+  @@index([googlePlaceId])
+}
+
+model CallLog {
+  id             String      @id @default(cuid())
+  businessLeadId String
+  outcome        CallOutcome
+  notes          String?
+  nextFollowUpAt DateTime?
+  calledAt       DateTime    @default(now())
+  createdAt      DateTime    @default(now())
+
+  businessLead BusinessLead @relation(fields: [businessLeadId], references: [id])
+
+  @@index([businessLeadId])
+  @@index([outcome])
+  @@index([calledAt])
+  @@index([nextFollowUpAt])
+}
+
+model AppSettings {
+  id             String   @id @default("default")
+  dailyCallQuota Int      @default(5)
+  timezone       String   @default("Australia/Sydney")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model LeadStatusChange {
+  id                   String       @id @default(cuid())
+  businessLeadId       String
+  fromStatus           LeadStatus
+  toStatus             LeadStatus
+  countedForDailyQuota Boolean      @default(false)
+  localDate            String
+  changedAt            DateTime     @default(now())
+  businessLead         BusinessLead @relation(fields: [businessLeadId], references: [id])
+
+  @@index([businessLeadId])
+  @@index([localDate])
+  @@index([countedForDailyQuota])
+}

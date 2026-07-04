@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import type { ImportSummary } from '@/lib/lead-importer';
 import {
   NormalizedPlace,
   SearchMode,
@@ -98,6 +99,8 @@ export default function SearchApp() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const handleSearch = useCallback(async () => {
     setLoading(true);
@@ -197,22 +200,53 @@ export default function SearchApp() {
     exportToCSV(places);
   }, [places]);
 
+  const handleImport = useCallback(async () => {
+    if (places.length === 0) { setError('No results to import.'); return; }
+    setImporting(true);
+    setImportSummary(null);
+    try {
+      const res = await fetch('/api/leads/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          places,
+          source: searchMode === 'nearby' ? 'GOOGLE_NEARBY' : 'GOOGLE_TEXT',
+          mode: searchMode,
+          areaLabel,
+          centerLat: lat,
+          centerLng: lng,
+          radiusMeters: radius,
+          textQuery,
+          includedTypes: selectedTypes,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Import failed'); return; }
+      setImportSummary(data as ImportSummary);
+    } catch { setError('Import failed — network error'); }
+    finally { setImporting(false); }
+  }, [places, searchMode, areaLabel, lat, lng, radius, textQuery, selectedTypes]);
+
+  const importedPlaceIds = importSummary
+    ? new Set(importSummary.imported.map((i) => i.googlePlaceId))
+    : undefined;
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
-      {/* Top header */}
-      <header className="flex-shrink-0 h-12 bg-white border-b border-slate-200 flex items-center px-5 gap-3">
-        <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center flex-shrink-0">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-          </svg>
-        </div>
-        <h1 className="text-sm font-semibold text-slate-900 tracking-tight">Local Lead Search</h1>
-        <div className="w-px h-4 bg-slate-200 ml-1" />
+    <div className="h-full flex flex-col overflow-hidden bg-slate-50">
+      {/* Action bar */}
+      <div className="flex-shrink-0 h-10 bg-white border-b border-slate-200 flex items-center px-5 gap-3">
         <p className="text-xs text-slate-400">Search Google Places by area, category, and radius</p>
+        <button
+          onClick={handleImport}
+          disabled={importing || places.length === 0}
+          className="ml-auto bg-brand-green hover:bg-brand-green-dark text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {importing ? 'Importing...' : 'Import to DB'}
+        </button>
 
         {/* Error toast */}
         {error && (
-          <div className="ml-auto flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg">
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
@@ -220,11 +254,24 @@ export default function SearchApp() {
             <button onClick={() => setError(null)} className="ml-1 hover:text-red-900 transition-colors">✕</button>
           </div>
         )}
-      </header>
+      </div>
+
+      {importSummary && (
+        <div className="flex items-center gap-4 px-4 py-2 bg-brand-green-light border-b border-brand-green/20 text-xs text-slate-700 flex-shrink-0">
+          <span className="font-medium text-brand-green-dark">Import complete</span>
+          <span>Raw: {importSummary.rawResultsCount}</span>
+          <span className="text-brand-green font-medium">New: {importSummary.newLeadsCount}</span>
+          <span>Existing: {importSummary.existingLeadsCount}</span>
+          <span className="text-brand-blue font-medium">TODO: {importSummary.todoCount}</span>
+          <span>Research: {importSummary.potentialCount}</span>
+          <span>Discarded: {importSummary.discardedCount}</span>
+          <button onClick={() => setImportSummary(null)} className="ml-auto text-slate-400 hover:text-slate-700">✕</button>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Dark sidebar */}
-        <aside className="w-72 bg-slate-900 flex-shrink-0 flex flex-col overflow-hidden">
+        <aside className="w-72 bg-brand-navy flex-shrink-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             <ControlPanel
               searchMode={searchMode}
@@ -266,7 +313,7 @@ export default function SearchApp() {
           </div>
 
           <div className="flex-1 overflow-hidden bg-white">
-            <ResultsTable places={places} />
+            <ResultsTable places={places} importedPlaceIds={importedPlaceIds} />
           </div>
         </main>
       </div>

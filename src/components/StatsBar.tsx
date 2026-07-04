@@ -3,7 +3,7 @@ import { SearchStats } from '@/types/places';
 interface StatProps {
   label: string;
   value: number;
-  color: 'slate' | 'emerald' | 'amber' | 'indigo';
+  color: 'slate' | 'emerald' | 'amber' | 'green';
 }
 
 function Stat({ label, value, color }: StatProps) {
@@ -11,7 +11,7 @@ function Stat({ label, value, color }: StatProps) {
     slate: 'text-slate-700',
     emerald: 'text-emerald-600',
     amber: 'text-amber-600',
-    indigo: 'text-indigo-600',
+    green: 'text-brand-green',
   };
   return (
     <div className="px-4 py-2.5">
@@ -33,7 +33,7 @@ export default function StatsBar({ stats }: { stats: SearchStats }) {
       <Stat label="New" value={stats.newAdded} color="emerald" />
       <Stat label="Dupes" value={stats.duplicatesSkipped} color="amber" />
       <div className="w-px h-10 bg-slate-100" />
-      <Stat label="Total Unique" value={stats.totalUnique} color="indigo" />
+      <Stat label="Total Unique" value={stats.totalUnique} color="green" />
     </div>
   );
 }

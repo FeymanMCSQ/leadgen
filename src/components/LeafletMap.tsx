@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { NormalizedPlace } from '@/types/places';
 
 // Leaflet's bundled marker PNGs are loaded from CDN to avoid webpack asset issues

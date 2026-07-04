@@ -30,7 +30,7 @@ function RatingDisplay({ rating, count }: { rating?: number; count?: number }) {
   );
 }
 
-export default function ResultsTable({ places }: { places: NormalizedPlace[] }) {
+export default function ResultsTable({ places, importedPlaceIds }: { places: NormalizedPlace[]; importedPlaceIds?: Set<string> }) {
   const [filter, setFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('distanceMeters');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -81,7 +81,7 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
     >
       <span className="flex items-center gap-1.5">
         {label}
-        <span className={`transition-opacity text-indigo-400 text-[10px] ${sortKey === col ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
+        <span className={`transition-opacity text-brand-green text-[10px] ${sortKey === col ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
           {sortDir === 'asc' ? '▲' : '▼'}
         </span>
       </span>
@@ -121,7 +121,7 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter results…"
-            className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 w-56 transition-colors placeholder-slate-400"
+            className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green w-56 transition-colors placeholder-slate-400"
           />
         </div>
         <span className="text-xs text-slate-400">
@@ -135,7 +135,7 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
       <div className="overflow-auto flex-1">
         <table className="text-xs min-w-max w-full border-collapse">
           <thead className="sticky top-0 z-10">
-            <tr className="bg-slate-800 text-slate-300 text-[10px] uppercase tracking-wide font-semibold">
+            <tr className="bg-brand-navy text-slate-300 text-[10px] uppercase tracking-wide font-semibold">
               <SortTh label="Name" col="name" />
               <SortTh label="Type" col="primaryType" />
               <StaticTh label="Address" />
@@ -153,10 +153,13 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
             {sorted.map((place, i) => (
               <tr
                 key={place.placeId}
-                className={`border-b border-slate-100 hover:bg-indigo-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}
+                className={`border-b border-slate-100 hover:bg-brand-green-light transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}
               >
                 <td className="px-4 py-2.5 font-medium text-slate-900 max-w-[200px] truncate" title={place.name}>
                   {place.name}
+                  {importedPlaceIds?.has(place.placeId) && (
+                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-brand-green-light text-brand-green-dark">DB</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 max-w-[130px] truncate">
                   <span className="text-slate-500">
@@ -175,7 +178,7 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
                       href={place.websiteUri}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors"
+                      className="text-brand-blue hover:underline font-medium transition-colors"
                     >
                       Link ↗
                     </a>
@@ -195,7 +198,7 @@ export default function ResultsTable({ places }: { places: NormalizedPlace[] }) 
                       href={place.googleMapsUri}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition-colors"
+                      className="text-brand-blue hover:underline font-medium transition-colors"
                     >
                       Maps ↗
                     </a>

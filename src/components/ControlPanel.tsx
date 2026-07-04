@@ -67,13 +67,13 @@ interface ControlPanelProps {
 }
 
 const inputCls =
-  'w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors';
+  'w-full bg-brand-navy-mid border border-brand-navy-border rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green transition-colors';
 
 const labelCls = 'block text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-1.5';
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-medium pt-5 pb-2 border-t border-slate-800 mt-1 first:border-t-0 first:pt-0">
+    <div className="text-[10px] uppercase tracking-widest text-slate-500 font-medium pt-5 pb-2 border-t border-brand-navy-mid mt-1 first:border-t-0 first:pt-0">
       {children}
     </div>
   );
@@ -106,12 +106,12 @@ export default function ControlPanel({
     <div className="p-4 space-y-0">
       {/* Mode toggle */}
       <div className="pb-4">
-        <div className="flex bg-slate-800 rounded-lg p-0.5">
+        <div className="flex bg-brand-navy-mid rounded-lg p-0.5">
           <button
             onClick={() => onSearchModeChange('nearby')}
             className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
               searchMode === 'nearby'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-brand-green text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -121,7 +121,7 @@ export default function ControlPanel({
             onClick={() => onSearchModeChange('text')}
             className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
               searchMode === 'text'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-brand-green text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -195,12 +195,12 @@ export default function ControlPanel({
         {searchMode === 'nearby' && (
           <div>
             <label className={labelCls}>Rank By</label>
-            <div className="flex bg-slate-800 rounded-lg p-0.5">
+            <div className="flex bg-brand-navy-mid rounded-lg p-0.5">
               <button
                 onClick={() => onRankPreferenceChange('DISTANCE')}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
                   rankPreference === 'DISTANCE'
-                    ? 'bg-slate-600 text-slate-100'
+                    ? 'bg-brand-navy-light text-slate-100'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -210,7 +210,7 @@ export default function ControlPanel({
                 onClick={() => onRankPreferenceChange('POPULARITY')}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
                   rankPreference === 'POPULARITY'
-                    ? 'bg-slate-600 text-slate-100'
+                    ? 'bg-brand-navy-light text-slate-100'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -246,7 +246,7 @@ export default function ControlPanel({
               <div className="flex gap-2">
                 <button
                   onClick={() => onSelectedTypesChange(availableTypes)}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="text-[11px] text-brand-green hover:text-brand-green-dark transition-colors"
                 >
                   All
                 </button>
@@ -259,7 +259,7 @@ export default function ControlPanel({
                 </button>
               </div>
             </div>
-            <div className="max-h-56 overflow-y-auto rounded-lg bg-slate-800 border border-slate-700 p-1.5">
+            <div className="max-h-56 overflow-y-auto rounded-lg bg-brand-navy-mid border border-brand-navy-border p-1.5">
               {CATEGORY_GROUPS.map((group) => (
                 <div key={group.label}>
                   <div className="px-2 pt-2 pb-1 text-[9px] uppercase tracking-widest text-slate-600 font-semibold select-none">
@@ -271,11 +271,11 @@ export default function ControlPanel({
                       <label
                         key={type}
                         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
-                          checked ? 'bg-indigo-600/20' : 'hover:bg-slate-700'
+                          checked ? 'bg-brand-green/20' : 'hover:bg-brand-navy-light'
                         }`}
                       >
                         <div className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
-                          checked ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'
+                          checked ? 'bg-brand-green border-brand-green' : 'border-brand-navy-border'
                         }`}>
                           {checked && (
                             <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
@@ -301,7 +301,7 @@ export default function ControlPanel({
       <SectionHeading>Options</SectionHeading>
       <label className="flex items-start gap-3 cursor-pointer group">
         <div className={`mt-0.5 w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
-          includeEnrichment ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600 group-hover:border-slate-500'
+          includeEnrichment ? 'bg-brand-green border-brand-green' : 'border-brand-navy-border group-hover:border-slate-500'
         }`}>
           {includeEnrichment && (
             <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
@@ -326,7 +326,7 @@ export default function ControlPanel({
         <button
           onClick={onSearch}
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-brand-green hover:bg-brand-green-dark active:bg-brand-green-dark text-white rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
@@ -344,14 +344,14 @@ export default function ControlPanel({
           <button
             onClick={onClear}
             disabled={loading}
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-brand-navy-mid hover:bg-brand-navy-light text-slate-300 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Clear ({placesCount})
           </button>
           <button
             onClick={onExport}
             disabled={loading || placesCount === 0}
-            className="bg-slate-800 hover:bg-emerald-800 text-slate-300 hover:text-emerald-200 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-brand-navy-mid hover:bg-brand-navy-light text-slate-300 hover:text-slate-100 rounded-lg px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Export CSV
           </button>
