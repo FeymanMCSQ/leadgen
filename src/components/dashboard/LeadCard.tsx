@@ -14,6 +14,8 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
   const [status, setStatus] = useState(lead.leadStatus);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const patch = async (overrides: { leadStatus?: string; notes?: string } = {}) => {
     const body: Record<string, string> = {};
@@ -46,6 +48,34 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
   const quickAction = (newStatus: string) => {
     setStatus(newStatus);
     patch({ leadStatus: newStatus });
+  };
+
+  const downloadPreviewPack = async () => {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/preview-pack`, { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Preview pack failed');
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') ?? '';
+      const filename = disposition.match(/filename="?([^"]+)"?/)?.[1] ?? 'preview-pack-business.zip';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Preview pack failed');
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   return (
@@ -96,7 +126,15 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
             {lead.userRatingCount != null && <span className="text-slate-300">({lead.userRatingCount})</span>}
           </span>
         )}
+        <button
+          onClick={downloadPreviewPack}
+          disabled={previewLoading}
+          className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+        >
+          {previewLoading ? 'Preparing…' : 'Preview Pack'}
+        </button>
       </div>
+      {previewError && <p className="text-xs text-red-600">{previewError}</p>}
 
       {/* TODO quick actions */}
       {activeGroup === 'todo' && (

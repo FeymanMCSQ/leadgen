@@ -109,6 +109,7 @@ Detailed architecture and decision records are in the `docs/` folder:
 | `architecture.md` | System overview, directory structure, request lifecycle |
 | `database.md` | Schema design, Prisma setup, connection pooling |
 | `lead-pipeline.md` | How leads are cleaned, scored, and classified |
+| `preview-pack.md` | Preview Pack ZIP download — implementation and design rationale |
 | `api.md` | All API routes — request/response shapes, design decisions |
 | `ui-ux.md` | Layout decisions, component design rationale |
 | `google-places.md` | Google Places API integration details |

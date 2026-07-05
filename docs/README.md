@@ -7,6 +7,7 @@ This folder contains architecture and decision records for the LeadGen applicati
 | [architecture.md](./architecture.md) | System overview, tech stack choices, request lifecycle |
 | [database.md](./database.md) | Prisma ORM, Prisma Postgres, schema design, migration strategy |
 | [lead-pipeline.md](./lead-pipeline.md) | Lead cleaning, scoring, status state machine, chain detection |
+| [preview-pack.md](./preview-pack.md) | Preview Pack ZIP download — live Place Details fetch, photo handling, no-storage design |
 | [google-places.md](./google-places.md) | Places API integration, field masks, deduplication, distance |
 | [map.md](./map.md) | Leaflet/OpenStreetMap choice, SSR issue and fix, icon workaround |
 | [api.md](./api.md) | All API routes, their inputs, outputs, and design rationale |

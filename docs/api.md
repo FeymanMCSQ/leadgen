@@ -149,6 +149,18 @@ Records a call attempt and automatically advances the lead's status.
 
 ---
 
+### `POST /api/leads/[id]/preview-pack`
+
+Fetches live Google Place Details for the lead's `googlePlaceId`, downloads up to 5 photos, and returns a ZIP containing `business.json` and a `photos/` folder. No request body.
+
+**Response:** `application/zip` binary body with `Content-Disposition: attachment; filename="preview-pack-[business-name].zip"`.
+
+**Errors:** `404` if the lead doesn't exist, `400` if it has no `googlePlaceId`, `502` if the Google Places API call fails.
+
+See [preview-pack.md](./preview-pack.md) for the full design rationale.
+
+---
+
 ## Dashboard routes
 
 ---
@@ -284,3 +296,4 @@ All routes return errors in the same format:
 - `400` — bad request (missing field, invalid enum value, validation failure)
 - `404` — lead not found
 - `500` — database error (full error logged server-side only, never sent to browser)
+- `502` — an upstream API (Google Places) failed or was unreachable; used only by routes that call Google live at request time (`preview-pack`)
