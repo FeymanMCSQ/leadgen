@@ -5,10 +5,10 @@ import { DashboardGroup, GROUP_EMPTY, LeadRow } from './types';
 
 export default function LeadList({
   group,
-  onQuotaIncrement,
+  onLeadUpdated,
 }: {
   group: DashboardGroup;
-  onQuotaIncrement: () => void;
+  onLeadUpdated: () => void;
 }) {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -19,7 +19,9 @@ export default function LeadList({
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/dashboard/leads?group=${group}&limit=100`);
+      const res = await fetch(`/api/dashboard/leads?group=${group}&limit=100`, {
+        cache: 'no-store',
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setLeads(data.leads ?? []);
@@ -33,11 +35,11 @@ export default function LeadList({
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
-  const handleUpdated = useCallback((id: string, quotaCounted: boolean) => {
+  const handleUpdated = useCallback((id: string, _quotaCounted: boolean) => {
     setLeads((prev) => prev.filter((l) => l.id !== id));
     setTotal((prev) => Math.max(0, prev - 1));
-    if (quotaCounted) onQuotaIncrement();
-  }, [onQuotaIncrement]);
+    onLeadUpdated();
+  }, [onLeadUpdated]);
 
   if (loading) return (
     <div className="py-20 text-center text-slate-400 text-sm">Loading…</div>

@@ -14,7 +14,7 @@ export default function DashboardApp() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/summary');
+      const res = await fetch('/api/dashboard/summary', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error();
       setSummary(data);
@@ -26,7 +26,7 @@ export default function DashboardApp() {
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
-  const handleQuotaIncrement = useCallback(() => {
+  const handleLeadUpdated = useCallback(() => {
     fetchSummary();
   }, [fetchSummary]);
 
@@ -64,7 +64,7 @@ export default function DashboardApp() {
             <LeadList
               key={activeGroup}
               group={activeGroup}
-              onQuotaIncrement={handleQuotaIncrement}
+              onLeadUpdated={handleLeadUpdated}
             />
           </div>
         </div>

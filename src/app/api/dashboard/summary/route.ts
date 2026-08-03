@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { getLocalDate } from '@/lib/timezone';
 import { GROUP_TO_STATUSES } from '@/lib/dashboard-groups';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const settings = await prisma.appSettings.upsert({
@@ -26,14 +29,17 @@ export async function GET() {
 
     const [todo, potential, inProgress, approved, declined] = groupCounts;
 
-    return NextResponse.json({
-      quota: settings.dailyCallQuota,
-      completedToday,
-      remainingToday: Math.max(0, settings.dailyCallQuota - completedToday),
-      timezone: settings.timezone,
-      localDate,
-      countsByGroup: { todo, potential, inProgress, approved, declined },
-    });
+    return NextResponse.json(
+      {
+        quota: settings.dailyCallQuota,
+        completedToday,
+        remainingToday: Math.max(0, settings.dailyCallQuota - completedToday),
+        timezone: settings.timezone,
+        localDate,
+        countsByGroup: { todo, potential, inProgress, approved, declined },
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+    );
   } catch (err) {
     console.error('GET /api/dashboard/summary error:', err);
     return NextResponse.json({ error: 'Failed to fetch summary' }, { status: 500 });

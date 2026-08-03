@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { GROUP_TO_STATUSES, VALID_GROUPS, type DashboardGroup } from '@/lib/dashboard-groups';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const group = searchParams.get('group') as DashboardGroup | null;
@@ -23,7 +26,10 @@ export async function GET(req: NextRequest) {
       }),
       prisma.businessLead.count({ where: { leadStatus: { in: statuses } } }),
     ]);
-    return NextResponse.json({ leads, total });
+    return NextResponse.json(
+      { leads, total },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+    );
   } catch (err) {
     console.error('GET /api/dashboard/leads error:', err);
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
