@@ -62,7 +62,6 @@ export default function DashboardApp() {
           )}
           <div className="px-4 pb-4 pt-4">
             <LeadList
-              key={activeGroup}
               group={activeGroup}
               onLeadUpdated={handleLeadUpdated}
             />

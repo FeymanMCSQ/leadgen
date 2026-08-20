@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { CallOutcome, LeadStatus } from '@prisma/client';
+import { getLocalDate } from '@/lib/timezone';
 
 const OUTCOME_TO_STATUS: Record<CallOutcome, LeadStatus> = {
   NO_ANSWER: 'CONTACTED',
@@ -28,24 +29,56 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Invalid outcome' }, { status: 400 });
   }
 
-  const newStatus = OUTCOME_TO_STATUS[body.outcome];
+  const outcome = body.outcome;
+  const newStatus = OUTCOME_TO_STATUS[outcome];
 
   try {
-    const [callLog, updatedLead] = await prisma.$transaction([
-      prisma.callLog.create({
+    const settings = await prisma.appSettings.upsert({
+      where: { id: 'default' },
+      update: {},
+      create: { id: 'default', dailyCallQuota: 5, timezone: 'Australia/Sydney' },
+    });
+    const localDate = getLocalDate(settings.timezone);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.businessLead.findUnique({ where: { id: params.id } });
+      if (!existing) return null;
+
+      const alreadyCounted = await tx.leadStatusChange.findFirst({
+        where: { businessLeadId: params.id, localDate, countedForDailyQuota: true },
+      });
+      const quotaCounted = !alreadyCounted;
+
+      const callLog = await tx.callLog.create({
         data: {
           businessLeadId: params.id,
-          outcome: body.outcome,
+          outcome,
           notes: body.notes,
           nextFollowUpAt: body.nextFollowUpAt ? new Date(body.nextFollowUpAt) : undefined,
         },
-      }),
-      prisma.businessLead.update({
+      });
+      const updatedLead = await tx.businessLead.update({
         where: { id: params.id },
         data: { leadStatus: newStatus },
-      }),
-    ]);
-    return NextResponse.json({ callLog, updatedLead });
+      });
+
+      if (existing.leadStatus !== newStatus || quotaCounted) {
+        await tx.leadStatusChange.create({
+          data: {
+            businessLeadId: params.id,
+            fromStatus: existing.leadStatus,
+            toStatus: newStatus,
+            countedForDailyQuota: quotaCounted,
+            localDate,
+          },
+        });
+      }
+
+      return { callLog, updatedLead, quotaCounted };
+    });
+
+    if (!result) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    return NextResponse.json(result);
   } catch (err) {
     console.error('POST /api/leads/[id]/call-log error:', err);
     return NextResponse.json({ error: 'Call log failed' }, { status: 500 });

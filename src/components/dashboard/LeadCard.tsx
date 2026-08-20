@@ -16,6 +16,8 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
   const [saved, setSaved] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [callLoading, setCallLoading] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
 
   const patch = async (overrides: { leadStatus?: string; notes?: string } = {}) => {
     const body: Record<string, string> = {};
@@ -48,6 +50,26 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
   const quickAction = (newStatus: string) => {
     setStatus(newStatus);
     patch({ leadStatus: newStatus });
+  };
+
+  const markCalled = async () => {
+    setCallLoading(true);
+    setCallError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/call-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome: 'OTHER' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Could not mark called');
+      setStatus(data.updatedLead.leadStatus);
+      onUpdated(lead.id, data.quotaCounted ?? false);
+    } catch (err) {
+      setCallError(err instanceof Error ? err.message : 'Could not mark called');
+    } finally {
+      setCallLoading(false);
+    }
   };
 
   const downloadPreviewPack = async () => {
@@ -126,15 +148,31 @@ export default function LeadCard({ lead, activeGroup, onUpdated }: LeadCardProps
             {lead.userRatingCount != null && <span className="text-slate-300">({lead.userRatingCount})</span>}
           </span>
         )}
+        {activeGroup !== 'approved' && activeGroup !== 'declined' && (
+          <button
+            onClick={markCalled}
+            disabled={callLoading}
+            className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-brand-green text-white hover:bg-brand-green-dark font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+          >
+            {callLoading ? 'Saving...' : lead.callCount > 0 ? 'Mark Called Again' : 'Mark Called'}
+          </button>
+        )}
         <button
           onClick={downloadPreviewPack}
           disabled={previewLoading}
-          className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+          className={`${activeGroup === 'approved' || activeGroup === 'declined' ? 'ml-auto ' : ''}text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 font-medium transition-colors disabled:opacity-50 whitespace-nowrap`}
         >
           {previewLoading ? 'Preparing…' : 'Preview Pack'}
         </button>
       </div>
       {previewError && <p className="text-xs text-red-600">{previewError}</p>}
+      {callError && <p className="text-xs text-red-600">{callError}</p>}
+      {lead.lastCalledAt && (
+        <p className="text-[11px] text-slate-400">
+          Last called {new Date(lead.lastCalledAt).toLocaleString()}
+          {lead.callCount > 1 ? ` | ${lead.callCount} calls logged` : ''}
+        </p>
+      )}
 
       {/* TODO quick actions */}
       {activeGroup === 'todo' && (

@@ -1,4 +1,6 @@
 export type DashboardGroup = 'todo' | 'potential' | 'inProgress' | 'approved' | 'declined';
+export type DashboardSort = 'uncalledFirst' | 'addedOldest' | 'addedNewest' | 'score';
+export type DashboardGrouping = 'none' | 'callStatus';
 
 export interface DashboardSummary {
   quota: number;
@@ -29,7 +31,23 @@ export interface LeadRow {
   leadScore: number;
   notes?: string;
   formattedAddress?: string;
+  createdAt: string;
+  callCount: number;
+  lastCalledAt?: string | null;
+  lastCallOutcome?: string | null;
 }
+
+export const SORT_OPTIONS: { value: DashboardSort; label: string }[] = [
+  { value: 'uncalledFirst', label: 'Uncalled first' },
+  { value: 'addedOldest', label: 'Added oldest' },
+  { value: 'addedNewest', label: 'Added newest' },
+  { value: 'score', label: 'Highest score' },
+];
+
+export const GROUPING_OPTIONS: { value: DashboardGrouping; label: string }[] = [
+  { value: 'none', label: 'No grouping' },
+  { value: 'callStatus', label: 'Group by call status' },
+];
 
 export const GROUP_LABELS: Record<DashboardGroup, string> = {
   todo: 'To Do',
