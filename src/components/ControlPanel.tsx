@@ -59,6 +59,9 @@ interface ControlPanelProps {
   onTextQueryChange: (v: string) => void;
   includeEnrichment: boolean;
   onIncludeEnrichmentChange: (v: boolean) => void;
+}
+
+interface ControlPanelActionsProps {
   onSearch: () => void;
   onClear: () => void;
   onExport: () => void;
@@ -91,8 +94,6 @@ export default function ControlPanel({
   availableTypes,
   textQuery, onTextQueryChange,
   includeEnrichment, onIncludeEnrichmentChange,
-  onSearch, onClear, onExport,
-  loading, placesCount,
 }: ControlPanelProps) {
   const toggleType = (type: string) => {
     onSelectedTypesChange(
@@ -270,10 +271,16 @@ export default function ControlPanel({
                     return (
                       <label
                         key={type}
-                        className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                        className={`relative flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors focus-within:ring-1 focus-within:ring-brand-green ${
                           checked ? 'bg-brand-green/20' : 'hover:bg-brand-navy-light'
                         }`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleType(type)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
                         <div className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
                           checked ? 'bg-brand-green border-brand-green' : 'border-brand-navy-border'
                         }`}>
@@ -283,7 +290,6 @@ export default function ControlPanel({
                             </svg>
                           )}
                         </div>
-                        <input type="checkbox" checked={checked} onChange={() => toggleType(type)} className="sr-only" />
                         <span className={`text-xs transition-colors ${checked ? 'text-slate-200' : 'text-slate-400'}`}>
                           {type.replace(/_/g, ' ')}
                         </span>
@@ -299,7 +305,13 @@ export default function ControlPanel({
 
       {/* Options section */}
       <SectionHeading>Options</SectionHeading>
-      <label className="flex items-start gap-3 cursor-pointer group">
+      <label className="relative flex items-start gap-3 cursor-pointer group rounded focus-within:ring-1 focus-within:ring-brand-green">
+        <input
+          type="checkbox"
+          checked={includeEnrichment}
+          onChange={(e) => onIncludeEnrichmentChange(e.target.checked)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
         <div className={`mt-0.5 w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
           includeEnrichment ? 'bg-brand-green border-brand-green' : 'border-brand-navy-border group-hover:border-slate-500'
         }`}>
@@ -309,20 +321,25 @@ export default function ControlPanel({
             </svg>
           )}
         </div>
-        <input
-          type="checkbox"
-          checked={includeEnrichment}
-          onChange={(e) => onIncludeEnrichmentChange(e.target.checked)}
-          className="sr-only"
-        />
         <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors leading-relaxed">
           Include website + phone
           <span className="block text-slate-600 text-[11px] mt-0.5">Uses more API quota</span>
         </span>
       </label>
 
-      {/* Action buttons */}
-      <div className="pt-5 space-y-2">
+    </div>
+  );
+}
+
+export function ControlPanelActions({
+  onSearch,
+  onClear,
+  onExport,
+  loading,
+  placesCount,
+}: ControlPanelActionsProps) {
+  return (
+    <div className="flex-shrink-0 border-t border-brand-navy-border bg-brand-navy p-4 pt-3 space-y-2 shadow-[0_-8px_20px_rgba(0,0,0,0.12)]">
         <button
           onClick={onSearch}
           disabled={loading}
@@ -356,7 +373,6 @@ export default function ControlPanel({
             Export CSV
           </button>
         </div>
-      </div>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from '@/types/places';
 import { haversineDistance } from '@/lib/haversine';
 import { exportToCSV } from '@/lib/csvExport';
-import ControlPanel from './ControlPanel';
+import ControlPanel, { ControlPanelActions } from './ControlPanel';
 import MapPanel from './MapPanel';
 import ResultsTable from './ResultsTable';
 import StatsBar from './StatsBar';
@@ -232,7 +232,7 @@ export default function SearchApp() {
     : undefined;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-slate-50">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden bg-slate-50">
       {/* Action bar */}
       <div className="flex-shrink-0 h-10 bg-white border-b border-slate-200 flex items-center px-5 gap-3">
         <p className="text-xs text-slate-400">Search Google Places by area, category, and radius</p>
@@ -269,10 +269,10 @@ export default function SearchApp() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Dark sidebar */}
-        <aside className="w-72 bg-brand-navy flex-shrink-0 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
+        <aside className="w-72 min-h-0 bg-brand-navy flex-shrink-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <ControlPanel
               searchMode={searchMode}
               onSearchModeChange={setSearchMode}
@@ -295,13 +295,15 @@ export default function SearchApp() {
               onTextQueryChange={setTextQuery}
               includeEnrichment={includeEnrichment}
               onIncludeEnrichmentChange={setIncludeEnrichment}
-              onSearch={handleSearch}
-              onClear={handleClear}
-              onExport={handleExport}
-              loading={loading}
-              placesCount={places.length}
             />
           </div>
+          <ControlPanelActions
+            onSearch={handleSearch}
+            onClear={handleClear}
+            onExport={handleExport}
+            loading={loading}
+            placesCount={places.length}
+          />
         </aside>
 
         {/* Main content */}
