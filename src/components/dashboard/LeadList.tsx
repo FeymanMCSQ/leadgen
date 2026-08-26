@@ -20,7 +20,7 @@ export default function LeadList({
 }) {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sort, setSort] = useState<DashboardSort>('uncalledFirst');
   const [grouping, setGrouping] = useState<DashboardGrouping>('none');
@@ -51,9 +51,7 @@ export default function LeadList({
     onLeadUpdated();
   }, [fetchLeads, onLeadUpdated]);
 
-  if (loading) return (
-    <div className="py-20 text-center text-slate-400 text-sm">Loading…</div>
-  );
+  if (loading && leads.length === 0) return <LeadListSkeleton />;
   if (error) return (
     <div className="py-20 text-center text-red-400 text-sm">{error}</div>
   );
@@ -114,6 +112,25 @@ export default function LeadList({
             </div>
           </section>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function LeadListSkeleton() {
+  return (
+    <div className="animate-pulse" aria-label="Loading leads">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="h-3 w-14 rounded bg-slate-100" />
+        <div className="flex gap-2">
+          <div className="h-7 w-28 rounded-md bg-slate-100" />
+          <div className="h-7 w-36 rounded-md bg-slate-100" />
+        </div>
+      </div>
+      <div className="space-y-3">
+        <div className="h-28 rounded-xl border border-slate-100 bg-slate-50" />
+        <div className="h-28 rounded-xl border border-slate-100 bg-slate-50" />
+        <div className="h-28 rounded-xl border border-slate-100 bg-slate-50" />
       </div>
     </div>
   );
