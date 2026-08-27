@@ -22,7 +22,7 @@ export default function LeadList({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sort, setSort] = useState<DashboardSort>('uncalledFirst');
+  const [sort, setSort] = useState<DashboardSort>('addedNewest');
   const [grouping, setGrouping] = useState<DashboardGrouping>('none');
 
   const fetchLeads = useCallback(async () => {

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const group = searchParams.get('group') as DashboardGroup | null;
   const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500);
   const offset = parseInt(searchParams.get('offset') ?? '0', 10);
-  const requestedSort = searchParams.get('sort') ?? 'uncalledFirst';
+  const requestedSort = searchParams.get('sort') ?? 'addedNewest';
 
   if (!group || !VALID_GROUPS.includes(group)) {
     return NextResponse.json({ error: `group must be one of: ${VALID_GROUPS.join(', ')}` }, { status: 400 });
