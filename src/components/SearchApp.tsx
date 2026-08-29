@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ImportSummary } from '@/lib/lead-importer';
 import {
   NormalizedPlace,
@@ -14,6 +14,7 @@ import ControlPanel, { ControlPanelActions } from './ControlPanel';
 import MapPanel from './MapPanel';
 import ResultsTable from './ResultsTable';
 import StatsBar from './StatsBar';
+import { CoverageBlock, formatCoverageBlock } from '@/lib/coverage-grid';
 
 export const DEFAULT_TYPES = [
   // Beauty & wellness
@@ -78,6 +79,16 @@ export const DEFAULT_TYPES = [
   'accounting',
 ];
 
+const COVERAGE_WORKSPACE_STORAGE_KEY = 'leadgen.coverage-workspace.v1';
+
+type SavedCoverageWorkspace = {
+  areaLabel: string;
+  lat: number;
+  lng: number;
+  radius: number;
+  selectedTypes: string[];
+};
+
 export default function SearchApp() {
   const [searchMode, setSearchMode] = useState<SearchMode>('nearby');
   const [areaLabel, setAreaLabel] = useState('Kensington NSW');
@@ -101,10 +112,41 @@ export default function SearchApp() {
   const [error, setError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [importing, setImporting] = useState(false);
+  const [hasUnimportedSearch, setHasUnimportedSearch] = useState(false);
+  const [searchedTypes, setSearchedTypes] = useState<string[]>([]);
+  const [coverageVersion, setCoverageVersion] = useState(0);
+  const [coverageWorkspaceRestored, setCoverageWorkspaceRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(COVERAGE_WORKSPACE_STORAGE_KEY);
+      if (!stored) return;
+      const saved = JSON.parse(stored) as Partial<SavedCoverageWorkspace>;
+      if (typeof saved.lat === 'number' && Number.isFinite(saved.lat)) setLat(saved.lat);
+      if (typeof saved.lng === 'number' && Number.isFinite(saved.lng)) setLng(saved.lng);
+      if (saved.radius === 500 || saved.radius === 1000) setRadius(saved.radius);
+      if (typeof saved.areaLabel === 'string' && saved.areaLabel.trim()) setAreaLabel(saved.areaLabel);
+      if (Array.isArray(saved.selectedTypes)) {
+        const validTypes = saved.selectedTypes.filter((type) => DEFAULT_TYPES.includes(type));
+        if (validTypes.length > 0) setSelectedTypes(validTypes);
+      }
+    } catch (error) {
+      console.error('Could not restore coverage workspace', error);
+    } finally {
+      setCoverageWorkspaceRestored(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!coverageWorkspaceRestored || searchMode !== 'nearby') return;
+    const workspace: SavedCoverageWorkspace = { areaLabel, lat, lng, radius, selectedTypes };
+    window.localStorage.setItem(COVERAGE_WORKSPACE_STORAGE_KEY, JSON.stringify(workspace));
+  }, [areaLabel, coverageWorkspaceRestored, lat, lng, radius, searchMode, selectedTypes]);
 
   const handleSearch = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setImportSummary(null);
 
     try {
       let response: Response;
@@ -162,6 +204,10 @@ export default function SearchApp() {
       if (!data.places || data.places.length === 0) {
         setError('No results found for this search.');
         setStats((prev) => ({ ...prev, rawReturned: data.rawCount ?? 0, newAdded: 0, duplicatesSkipped: 0 }));
+        setHasUnimportedSearch(true);
+        if (searchMode === 'nearby') {
+          setSearchedTypes((previous) => Array.from(new Set([...previous, ...selectedTypes])));
+        }
         return;
       }
 
@@ -181,6 +227,10 @@ export default function SearchApp() {
         setStats({ rawReturned: data.rawCount, newAdded: newOnes.length, duplicatesSkipped: dups, totalUnique: prev.length + newOnes.length });
         return [...prev, ...newOnes];
       });
+      setHasUnimportedSearch(true);
+      if (searchMode === 'nearby') {
+        setSearchedTypes((previous) => Array.from(new Set([...previous, ...selectedTypes])));
+      }
     } catch (err) {
       setError('Network error. Please check your connection.');
       console.error(err);
@@ -193,6 +243,9 @@ export default function SearchApp() {
     setPlaces([]);
     setStats({ rawReturned: 0, newAdded: 0, duplicatesSkipped: 0, totalUnique: 0 });
     setError(null);
+    setImportSummary(null);
+    setHasUnimportedSearch(false);
+    setSearchedTypes([]);
   }, []);
 
   const handleExport = useCallback(() => {
@@ -201,7 +254,7 @@ export default function SearchApp() {
   }, [places]);
 
   const handleImport = useCallback(async () => {
-    if (places.length === 0) { setError('No results to import.'); return; }
+    if (!hasUnimportedSearch) { setError('Run a search before importing.'); return; }
     setImporting(true);
     setImportSummary(null);
     try {
@@ -217,15 +270,36 @@ export default function SearchApp() {
           centerLng: lng,
           radiusMeters: radius,
           textQuery,
-          includedTypes: selectedTypes,
+          includedTypes: searchMode === 'nearby' ? searchedTypes : selectedTypes,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Import failed'); return; }
       setImportSummary(data as ImportSummary);
+      setHasUnimportedSearch(false);
+      setCoverageVersion((version) => version + 1);
     } catch { setError('Import failed — network error'); }
     finally { setImporting(false); }
-  }, [places, searchMode, areaLabel, lat, lng, radius, textQuery, selectedTypes]);
+  }, [places, searchMode, areaLabel, lat, lng, radius, textQuery, selectedTypes, searchedTypes, hasUnimportedSearch]);
+
+  const handleGridCellSelect = useCallback((block: CoverageBlock) => {
+    if (hasUnimportedSearch) {
+      const shouldDiscard = window.confirm('This block has an unimported search. Move blocks and discard those results?');
+      if (!shouldDiscard) return false;
+    }
+
+    setLat(block.center.lat);
+    setLng(block.center.lng);
+    setRadius(block.sizeMeters);
+    setAreaLabel(`Grid ${formatCoverageBlock(block)}`);
+    setPlaces([]);
+    setStats({ rawReturned: 0, newAdded: 0, duplicatesSkipped: 0, totalUnique: 0 });
+    setError(null);
+    setImportSummary(null);
+    setHasUnimportedSearch(false);
+    setSearchedTypes([]);
+    return true;
+  }, [hasUnimportedSearch]);
 
   const importedPlaceIds = importSummary
     ? new Set(importSummary.imported.map((i) => i.googlePlaceId))
@@ -238,10 +312,10 @@ export default function SearchApp() {
         <p className="text-xs text-slate-400">Search Google Places by area, category, and radius</p>
         <button
           onClick={handleImport}
-          disabled={importing || places.length === 0}
+          disabled={importing || !hasUnimportedSearch}
           className="ml-auto bg-brand-green hover:bg-brand-green-dark text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {importing ? 'Importing...' : 'Import to DB'}
+          {importing ? 'Importing...' : places.length === 0 && hasUnimportedSearch ? 'Mark searched' : 'Import to DB'}
         </button>
 
         {/* Error toast */}
@@ -255,6 +329,12 @@ export default function SearchApp() {
           </div>
         )}
       </div>
+
+      {searchMode === 'nearby' && hasUnimportedSearch && maxResults === 20 && stats.rawReturned >= 20 && (
+        <div className="flex-shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          This block reached Google&apos;s 20-result limit. Import it, then switch the grid to 500 m to cover it in smaller blocks.
+        </div>
+      )}
 
       {importSummary && (
         <div className="flex items-center gap-4 px-4 py-2 bg-brand-green-light border-b border-brand-green/20 text-xs text-slate-700 flex-shrink-0">
@@ -311,7 +391,14 @@ export default function SearchApp() {
           <StatsBar stats={stats} />
 
           <div className="h-80 flex-shrink-0 border-b border-slate-200">
-            <MapPanel center={{ lat, lng }} radius={radius} places={places} />
+            <MapPanel
+              center={{ lat, lng }}
+              radius={radius}
+              places={places}
+              selectedTypes={selectedTypes}
+              coverageVersion={coverageVersion}
+              onCellSelect={handleGridCellSelect}
+            />
           </div>
 
           <div className="flex-1 overflow-hidden bg-white">
